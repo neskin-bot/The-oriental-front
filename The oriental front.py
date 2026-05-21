@@ -180,11 +180,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
         print("Os tiros da tropa alemã erraram o alvo, causando apenas", dano, "de dano por estilhaços")
      elif dano >= 5 and dano <= 18:
          print("Os tiros da tropa alemã acertaram o alvo, causando", dano, "de dano")
-<<<<<<< HEAD
      hp_sovietico = max(0, hp_sovietico - dano)
-=======
-     hp_sovietico -= dano
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
      print(f"A vida do pelotão soviético é de {hp_sovietico}")
      print()
        
@@ -193,11 +189,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
 
      dano_total = 0
 
-<<<<<<< HEAD
      for tiro in range(1, 5):
-=======
-     for tiro in range(1, 7):
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
         dano_tiro = random.randint(1, 7)
         dano_total += dano_tiro
         print(f"Tiro {tiro} acertou! Causou {dano_tiro} de dano")
@@ -205,11 +197,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
 
      print(f"\nA rajada do pelotão alemão causou {dano_total} de dano")
 
-<<<<<<< HEAD
      hp_sovietico = max(0, hp_sovietico - dano_total)
-=======
-     hp_sovietico -= dano_total
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
 
      print(f"A vida do pelotão soviético é de {hp_sovietico}")
 
@@ -219,13 +207,8 @@ while hp_alemao > 0 and hp_sovietico > 0:
      espera(3)
      print(f"O Stuka solta suas bombas sobre as tropas soviéticas causando {dano} de dano!")
      espera(3)
-<<<<<<< HEAD
      hp_sovietico = max(0, hp_sovietico - dano)
      print(f"A vida do pelotão soviético é de {hp_sovietico}")
-=======
-     hp_sovietico -= dano
-     print(f"A vida do pelotão alemão é de {hp_alemao}")
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
  if hp_sovietico <= 0:
      break
  print("O pelotão soviético se prepara para contra-atacar. . .")
@@ -258,11 +241,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
          print("Os tiros da tropa soviética erraram o alvo, causando apenas", dano, "de dano por estilhaços")
      else:
          print(f"Os tiros da tropa soviética acertam o alvo, causando {dano} de dano")
-<<<<<<< HEAD
      hp_alemao = max(0, hp_alemao - dano)
-=======
-     hp_alemao -= dano
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
      print(f"A vida do pelotão alemão é de {hp_alemao}")
      espera(4)
  elif escolha_ataque == 2:
@@ -278,11 +257,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
 
      print(f"\nA rajada do pelotão soviético causou {dano_total} de dano")
 
-<<<<<<< HEAD
      hp_alemao = max(0, hp_alemao - dano_total)
-=======
-     hp_alemao -= dano_total
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
 
      print(f"A vida do pelotão alemão é de {hp_alemao}")
 
@@ -292,11 +267,7 @@ while hp_alemao > 0 and hp_sovietico > 0:
      espera(3)
      print(f"O IL-2 atira uma rajada com os seus canhões de 20mm na tropa alemã, causando {dano} de dano!")
      espera(3)
-<<<<<<< HEAD
      hp_alemao = max(0, hp_alemao - dano)
-=======
-     hp_alemao -= dano
->>>>>>> 52c75644c852d121327ba67dc8d84c1bb2893520
      print(f"A vida do pelotão alemão é de {hp_alemao}")
  if hp_alemao <= 0:
      break
