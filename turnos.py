@@ -40,12 +40,25 @@ def montar_opcoes_disponiveis(unidade_atual):
         else:
             opcoes.append((None, None, "Submetralhadora sem munição — chame o caminhão de suprimento."))
 
+        if unidade.tem_municao(unidade_atual, "anti_tank"):
+            usos = unidade.usos_restantes(unidade_atual, "anti_tank")
+            nome_arma = config.DADOS_LADOS[unidade_atual["lado_id"]]["arma_anti_tank_nome"]
+            texto = (f"Atacar com {nome_arma} (restam {usos} uso(s)) — "
+                     f"custo {config.CUSTOS_ACAO['anti_tank']}")
+            opcoes.append((n, "anti_tank", texto))
+            n += 1
+        else:
+            nome_arma = config.DADOS_LADOS[unidade_atual["lado_id"]]["arma_anti_tank_nome"]
+            opcoes.append((None, None, f"{nome_arma} sem munição — chame o caminhão de suprimento."))
+
         opcoes.append((n, "suporte_aereo", f"Suporte aéreo — custo {config.CUSTOS_ACAO['suporte_aereo']}"))
         n += 1
         opcoes.append((n, "chamar_tanque", f"Chamar tanque — custo {config.CUSTOS_ACAO['chamar_tanque']}"))
         n += 1
 
     opcoes.append((n, "caminhao_suprimento", "Chamar caminhão de suprimento"))
+    n += 1
+    opcoes.append((n, "cobertura", "Buscar cobertura (grátis, sem bônus, reduz o próximo dano recebido)"))
     n += 1
     opcoes.append((n, "pular_vez", "Pular a vez (ganha pontos extras se reagrupando)"))
     n += 1
@@ -54,7 +67,8 @@ def montar_opcoes_disponiveis(unidade_atual):
     return opcoes
 
 
-def escolher_tipo_suprimento():
+def escolher_tipo_suprimento(unidade_atual):
+    nome_arma = config.DADOS_LADOS[unidade_atual["lado_id"]]["arma_anti_tank_nome"]
     print("\nQual caminhão você quer chamar?")
     print(f"[1] Caminhão médico — regenera {config.CURA_SUPRIMENTO} de vida"
           f" — custo {config.CUSTOS_ACAO['suprimento_medico']}")
@@ -62,11 +76,14 @@ def escolher_tipo_suprimento():
           f" — custo {config.CUSTOS_ACAO['suprimento_municao_rifle']}")
     print(f"[3] Caminhão de munição de submetralhadora — recarrega a SMG"
           f" — custo {config.CUSTOS_ACAO['suprimento_municao_smg']}")
-    escolha = utils.menu_seguro("Escolha o caminhão: ", [1, 2, 3])
+    print(f"[4] Caminhão de munição de {nome_arma} — recarrega a arma antitanque"
+          f" — custo {config.CUSTOS_ACAO['suprimento_municao_anti_tank']}")
+    escolha = utils.menu_seguro("Escolha o caminhão: ", [1, 2, 3, 4])
     return {
         1: "suprimento_medico",
         2: "suprimento_municao_rifle",
         3: "suprimento_municao_smg",
+        4: "suprimento_municao_anti_tank",
     }[escolha]
 
 
@@ -87,9 +104,25 @@ def turno_humano(unidade_atual, oponente, turno):
     chave_escolhida = next(chave for numero, chave, _ in opcoes if numero == escolha)
 
     if chave_escolhida == "caminhao_suprimento":
-        chave_escolhida = escolher_tipo_suprimento()
+        chave_escolhida = escolher_tipo_suprimento(unidade_atual)
 
     executar_acao(chave_escolhida, unidade_atual, oponente)
+
+
+def escolher_pular_ou_cobertura(unidade_atual, oponente):
+    """Quando o bot decide não gastar pontos nessa rodada, ele escolhe entre
+    pular a vez (ganha pontos extras, melhor quando não há ameaça à vista) e
+    buscar cobertura (sem bônus, mas reduz o próximo dano — melhor quando a
+    vida já não está cheia ou o inimigo tem munição pra um golpe forte)."""
+    vida_pct = unidade.vida_atual_principal(unidade_atual) / unidade.vida_maxima_principal(unidade_atual)
+    ameaca_grande = (
+        oponente["tanque_ativo"]
+        or unidade.pode_pagar(oponente, "suporte_aereo")
+        or unidade.pode_pagar(oponente, "chamar_tanque")
+    )
+    if vida_pct < 0.6 or ameaca_grande:
+        return "cobertura"
+    return "pular_vez"
 
 
 def escolher_acao_bot(unidade_atual, oponente, turno):
@@ -98,7 +131,7 @@ def escolher_acao_bot(unidade_atual, oponente, turno):
             if (unidade.vida_atual_principal(unidade_atual) < unidade_atual["vida_maxima"] * 0.4
                     and unidade.pode_pagar(unidade_atual, "suprimento_medico")):
                 return "suprimento_medico"
-            return "pular_vez"
+            return escolher_pular_ou_cobertura(unidade_atual, oponente)
 
         if oponente["tanque_ativo"]:
             return "tanque_perfurante"
@@ -108,12 +141,30 @@ def escolher_acao_bot(unidade_atual, oponente, turno):
     if vida_pct < 0.3 and unidade.pode_pagar(unidade_atual, "suprimento_medico") and random.randint(1, 100) <= 60:
         return "suprimento_medico"
 
-    if (not oponente["tanque_ativo"] and turno >= 3 and unidade.pode_pagar(unidade_atual, "chamar_tanque")
-            and random.randint(1, 100) <= 25):
-        return "chamar_tanque"
+    # a partir daqui, cada "quero fazer algo grande" é separado de "tenho
+    # pontos pra isso" — se o bot queria mas não pode pagar ainda, ele
+    # economiza de propósito em vez de gastar os pontos em ataques pequenos.
 
-    if turno >= 4 and unidade.pode_pagar(unidade_atual, "suporte_aereo") and random.randint(1, 100) <= 30:
-        return "suporte_aereo"
+    quer_chamar_tanque = not oponente["tanque_ativo"] and turno >= 3 and random.randint(1, 100) <= 25
+    if quer_chamar_tanque:
+        if unidade.pode_pagar(unidade_atual, "chamar_tanque"):
+            return "chamar_tanque"
+        return escolher_pular_ou_cobertura(unidade_atual, oponente)
+
+    quer_suporte_aereo = turno >= 4 and random.randint(1, 100) <= 30
+    if quer_suporte_aereo:
+        if unidade.pode_pagar(unidade_atual, "suporte_aereo"):
+            return "suporte_aereo"
+        return escolher_pular_ou_cobertura(unidade_atual, oponente)
+
+    if oponente["tanque_ativo"]:
+        if unidade.pode_pagar(unidade_atual, "anti_tank") and unidade.tem_municao(unidade_atual, "anti_tank"):
+            return "anti_tank"
+        if unidade.pode_pagar(unidade_atual, "suprimento_municao_anti_tank"):
+            return "suprimento_municao_anti_tank"
+        # sem munição nem pontos pra recarregar — atirar com rifle/smg num
+        # tanque não adianta quase nada, então prefere economizar a desperdiçar.
+        return escolher_pular_ou_cobertura(unidade_atual, oponente)
 
     if unidade.pode_pagar(unidade_atual, "submetralhadora") and random.randint(1, 100) <= 55:
         if unidade.tem_municao(unidade_atual, "smg"):
@@ -127,7 +178,7 @@ def escolher_acao_bot(unidade_atual, oponente, turno):
         if unidade.pode_pagar(unidade_atual, "suprimento_municao_rifle"):
             return "suprimento_municao_rifle"
 
-    return "pular_vez"
+    return escolher_pular_ou_cobertura(unidade_atual, oponente)
 
 
 def turno_bot(unidade_atual, oponente, turno):
@@ -150,6 +201,13 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         utils.espera(1.5)
         return
 
+    if chave_acao == "cobertura":
+        unidade.ativar_cobertura(unidade_atual)
+        print(f"{unidade_atual['nome']} busca cobertura — sem custo, mas também sem os pontos extras "
+              f"de pular a vez. Reduz o próximo dano recebido, sem garantia total.")
+        utils.espera(1.5)
+        return
+
     if chave_acao == "rifle" and not unidade.tem_municao(unidade_atual, "rifle"):
         print(f"{unidade_atual['nome']} está sem munição de rifle!")
         utils.espera(1.2)
@@ -157,6 +215,11 @@ def executar_acao(chave_acao, unidade_atual, oponente):
 
     if chave_acao == "submetralhadora" and not unidade.tem_municao(unidade_atual, "smg"):
         print(f"{unidade_atual['nome']} está sem munição de submetralhadora!")
+        utils.espera(1.2)
+        return
+
+    if chave_acao == "anti_tank" and not unidade.tem_municao(unidade_atual, "anti_tank"):
+        print(f"{unidade_atual['nome']} está sem munição da arma antitanque!")
         utils.espera(1.2)
         return
 
@@ -171,6 +234,8 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         ataques.ataque_rifle(unidade_atual, oponente)
     elif chave_acao == "submetralhadora":
         ataques.ataque_submetralhadora(unidade_atual, oponente)
+    elif chave_acao == "anti_tank":
+        ataques.ataque_anti_tank(unidade_atual, oponente)
     elif chave_acao == "suporte_aereo":
         ataques.usar_suporte_aereo(unidade_atual, oponente)
     elif chave_acao == "suprimento_medico":
@@ -179,6 +244,8 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         suprimentos.usar_suprimento_municao_rifle(unidade_atual)
     elif chave_acao == "suprimento_municao_smg":
         suprimentos.usar_suprimento_municao_smg(unidade_atual)
+    elif chave_acao == "suprimento_municao_anti_tank":
+        suprimentos.usar_suprimento_municao_anti_tank(unidade_atual)
     elif chave_acao == "chamar_tanque":
         modulo_tanque.chamar_tanque(unidade_atual)
     elif chave_acao == "tanque_metralhadora":
@@ -187,3 +254,4 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         modulo_tanque.ataque_tanque_perfurante(unidade_atual, oponente)
     elif chave_acao == "tanque_explosivo":
         modulo_tanque.ataque_tanque_explosivo(unidade_atual, oponente)
+        

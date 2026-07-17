@@ -44,7 +44,7 @@ def ataque_tanque_perfurante(atacante, defensor):
         dano = random.randint(2, 6)
         print("Sem um tanque inimigo pra perfurar, o disparo causa só um dano residual.")
     dano = unidade.dano_com_buff(defensor, dano)
-    unidade.aplicar_dano(defensor, dano)
+    unidade.aplicar_dano(defensor, dano, pular_reducao_blindagem=True)
     atacante["tanque_cooldown"] = config.TANQUE_COOLDOWN_RODADAS
     utils.espera(1.8)
 
@@ -60,7 +60,7 @@ def ataque_tanque_explosivo(atacante, defensor):
         dano = random.randint(2, 6)
         print("Contra um blindado, a explosão causa só um dano residual.")
     dano = unidade.dano_com_buff(defensor, dano)
-    unidade.aplicar_dano(defensor, dano)
+    unidade.aplicar_dano(defensor, dano, pular_reducao_blindagem=True)
     atacante["tanque_cooldown"] = config.TANQUE_COOLDOWN_RODADAS
     utils.espera(1.8)
 
