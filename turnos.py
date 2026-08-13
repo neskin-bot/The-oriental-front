@@ -1,11 +1,10 @@
-import random
-
 import config
 import utils
 import unidade
 import ataques
 import suprimentos
 import tanque as modulo_tanque
+import bot
 
 
 def montar_opcoes_disponiveis(unidade_atual):
@@ -23,6 +22,9 @@ def montar_opcoes_disponiveis(unidade_atual):
                 n += 1
         else:
             opcoes.append((None, None, "O tanque está em cooldown / se posicionando nesta rodada."))
+
+        opcoes.append((n, "sair_tanque", "Sair do tanque e voltar a lutar como infantaria — grátis"))
+        n += 1
     else:
         if unidade.tem_municao(unidade_atual, "rifle"):
             usos = unidade.usos_restantes(unidade_atual, "rifle")
@@ -60,8 +62,9 @@ def montar_opcoes_disponiveis(unidade_atual):
     n += 1
     opcoes.append((n, "cobertura", "Buscar cobertura (grátis, sem bônus, reduz o próximo dano recebido)"))
     n += 1
-    opcoes.append((n, "pular_vez", "Pular a vez (ganha pontos extras se reagrupando)"))
-    n += 1
+    if not unidade_atual["tanque_ativo"]:
+        opcoes.append((n, "pular_vez", "Pular a vez (ganha pontos extras se reagrupando)"))
+        n += 1
     opcoes.append((n, "fugir", "Fugir da batalha"))
 
     return opcoes
@@ -109,80 +112,8 @@ def turno_humano(unidade_atual, oponente, turno):
     executar_acao(chave_escolhida, unidade_atual, oponente)
 
 
-def escolher_pular_ou_cobertura(unidade_atual, oponente):
-    """Quando o bot decide não gastar pontos nessa rodada, ele escolhe entre
-    pular a vez (ganha pontos extras, melhor quando não há ameaça à vista) e
-    buscar cobertura (sem bônus, mas reduz o próximo dano — melhor quando a
-    vida já não está cheia ou o inimigo tem munição pra um golpe forte)."""
-    vida_pct = unidade.vida_atual_principal(unidade_atual) / unidade.vida_maxima_principal(unidade_atual)
-    ameaca_grande = (
-        oponente["tanque_ativo"]
-        or unidade.pode_pagar(oponente, "suporte_aereo")
-        or unidade.pode_pagar(oponente, "chamar_tanque")
-    )
-    if vida_pct < 0.6 or ameaca_grande:
-        return "cobertura"
-    return "pular_vez"
-
-
-def escolher_acao_bot(unidade_atual, oponente, turno):
-    if unidade_atual["tanque_ativo"]:
-        if not modulo_tanque.tanque_pode_atacar(unidade_atual):
-            if (unidade.vida_atual_principal(unidade_atual) < unidade_atual["vida_maxima"] * 0.4
-                    and unidade.pode_pagar(unidade_atual, "suprimento_medico")):
-                return "suprimento_medico"
-            return escolher_pular_ou_cobertura(unidade_atual, oponente)
-
-        if oponente["tanque_ativo"]:
-            return "tanque_perfurante"
-        return "tanque_explosivo" if random.random() < 0.7 else "tanque_metralhadora"
-
-    vida_pct = unidade_atual["vida_atual"] / unidade_atual["vida_maxima"]
-    if vida_pct < 0.3 and unidade.pode_pagar(unidade_atual, "suprimento_medico") and random.randint(1, 100) <= 60:
-        return "suprimento_medico"
-
-    # a partir daqui, cada "quero fazer algo grande" é separado de "tenho
-    # pontos pra isso" — se o bot queria mas não pode pagar ainda, ele
-    # economiza de propósito em vez de gastar os pontos em ataques pequenos.
-
-    quer_chamar_tanque = not oponente["tanque_ativo"] and turno >= 3 and random.randint(1, 100) <= 25
-    if quer_chamar_tanque:
-        if unidade.pode_pagar(unidade_atual, "chamar_tanque"):
-            return "chamar_tanque"
-        return escolher_pular_ou_cobertura(unidade_atual, oponente)
-
-    quer_suporte_aereo = turno >= 4 and random.randint(1, 100) <= 30
-    if quer_suporte_aereo:
-        if unidade.pode_pagar(unidade_atual, "suporte_aereo"):
-            return "suporte_aereo"
-        return escolher_pular_ou_cobertura(unidade_atual, oponente)
-
-    if oponente["tanque_ativo"]:
-        if unidade.pode_pagar(unidade_atual, "anti_tank") and unidade.tem_municao(unidade_atual, "anti_tank"):
-            return "anti_tank"
-        if unidade.pode_pagar(unidade_atual, "suprimento_municao_anti_tank"):
-            return "suprimento_municao_anti_tank"
-        # sem munição nem pontos pra recarregar — atirar com rifle/smg num
-        # tanque não adianta quase nada, então prefere economizar a desperdiçar.
-        return escolher_pular_ou_cobertura(unidade_atual, oponente)
-
-    if unidade.pode_pagar(unidade_atual, "submetralhadora") and random.randint(1, 100) <= 55:
-        if unidade.tem_municao(unidade_atual, "smg"):
-            return "submetralhadora"
-        if unidade.pode_pagar(unidade_atual, "suprimento_municao_smg"):
-            return "suprimento_municao_smg"
-
-    if unidade.pode_pagar(unidade_atual, "rifle"):
-        if unidade.tem_municao(unidade_atual, "rifle"):
-            return "rifle"
-        if unidade.pode_pagar(unidade_atual, "suprimento_municao_rifle"):
-            return "suprimento_municao_rifle"
-
-    return escolher_pular_ou_cobertura(unidade_atual, oponente)
-
-
 def turno_bot(unidade_atual, oponente, turno):
-    acao = escolher_acao_bot(unidade_atual, oponente, turno)
+    acao = bot.escolher_acao_bot(unidade_atual, oponente, turno)
     print(f"\n{unidade_atual['nome']} decide sua ação...")
     utils.espera(1)
     executar_acao(acao, unidade_atual, oponente)
@@ -201,10 +132,19 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         utils.espera(1.5)
         return
 
+    if chave_acao == "sair_tanque":
+        modulo_tanque.sair_do_tanque(unidade_atual)
+        return
+
     if chave_acao == "cobertura":
         unidade.ativar_cobertura(unidade_atual)
-        print(f"{unidade_atual['nome']} busca cobertura — sem custo, mas também sem os pontos extras "
-              f"de pular a vez. Reduz o próximo dano recebido, sem garantia total.")
+        if unidade_atual["tanque_ativo"]:
+            dados = config.DADOS_LADOS[unidade_atual["lado_id"]]
+            print(f"O {dados['tanque_nome']} se abriga atrás de destroços e vegetação — "
+                  f"reduz o próximo dano recebido, sem garantia total.")
+        else:
+            print(f"{unidade_atual['nome']} busca cobertura — sem custo, mas também sem os pontos extras "
+                  f"de pular a vez. Reduz o próximo dano recebido, sem garantia total.")
         utils.espera(1.5)
         return
 
@@ -254,4 +194,3 @@ def executar_acao(chave_acao, unidade_atual, oponente):
         modulo_tanque.ataque_tanque_perfurante(unidade_atual, oponente)
     elif chave_acao == "tanque_explosivo":
         modulo_tanque.ataque_tanque_explosivo(unidade_atual, oponente)
-        

@@ -34,6 +34,7 @@ CUSTOS_ACAO = {
     "anti_tank": 30,
     "suprimento_municao_anti_tank": 40,
     "chamar_tanque": 50,
+    "sair_tanque": 0,
     "cobertura": 0,
     "tanque_metralhadora": 8,
     "tanque_perfurante": 12,

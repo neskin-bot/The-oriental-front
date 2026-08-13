@@ -11,10 +11,22 @@ def chamar_tanque(unidade_atual):
     unidade_atual["tanque_vida"] = config.TANQUE_VIDA
     unidade_atual["tanque_recem_chamado"] = True
     unidade_atual["tanque_cooldown"] = 0
+    unidade_atual["tanque_bloqueado_por_cooldown"] = False
     print(f"O {dados['tanque_nome']} avança e assume a linha de frente!")
     utils.espera(1.2)
     print("Ele ainda está se posicionando — só poderá atacar na próxima rodada.")
     utils.espera(1.5)
+
+
+def sair_do_tanque(unidade_atual):
+    dados = config.DADOS_LADOS[unidade_atual["lado_id"]]
+    print(f"A tripulação abandona o {dados['tanque_nome']} e volta a lutar como infantaria.")
+    utils.espera(1.3)
+    unidade_atual["tanque_ativo"] = False
+    unidade_atual["tanque_vida"] = 0
+    unidade_atual["tanque_recem_chamado"] = False
+    unidade_atual["tanque_cooldown"] = 0
+    unidade_atual["tanque_bloqueado_por_cooldown"] = False
 
 
 def ataque_tanque_metralhadora(atacante, defensor):
@@ -68,12 +80,17 @@ def ataque_tanque_explosivo(atacante, defensor):
 def processa_chegada_e_cooldown_tanque(unidade_atual):
     if unidade_atual["tanque_recem_chamado"]:
         unidade_atual["tanque_recem_chamado"] = False
+        unidade_atual["tanque_bloqueado_por_cooldown"] = False
         return
+
     if unidade_atual["tanque_cooldown"] > 0:
+        unidade_atual["tanque_bloqueado_por_cooldown"] = True
         unidade_atual["tanque_cooldown"] -= 1
+    else:
+        unidade_atual["tanque_bloqueado_por_cooldown"] = False
 
 
 def tanque_pode_atacar(unidade_atual):
     return (unidade_atual["tanque_ativo"]
             and not unidade_atual["tanque_recem_chamado"]
-            and unidade_atual["tanque_cooldown"] == 0)
+            and not unidade_atual["tanque_bloqueado_por_cooldown"])

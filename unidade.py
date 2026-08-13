@@ -20,6 +20,7 @@ def criar_unidade(lado_id):
         "tanque_recem_chamado": False,
         "tanque_vida": 0,
         "tanque_cooldown": 0,
+        "tanque_bloqueado_por_cooldown": False,
         "em_cobertura": False,
         "fugiu": False,
     }
@@ -178,4 +179,3 @@ def recarregar_municao(unidade, arma):
         unidade["municao_smg"] = config.MUNICAO_MAXIMA_SMG
     elif arma == "anti_tank":
         unidade["municao_anti_tank"] = config.MUNICAO_MAXIMA_ANTI_TANK
-        
